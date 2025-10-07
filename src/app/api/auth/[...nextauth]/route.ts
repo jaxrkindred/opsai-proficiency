@@ -1,7 +1,7 @@
-import NextAuth, { NextAuthOptions } from "next-auth";
+import NextAuth from "next-auth";
 import EmailProvider from "next-auth/providers/email";
 
-const authOptions: NextAuthOptions = {
+const handler = NextAuth({
   providers: [
     EmailProvider({
       server: process.env.EMAIL_SERVER || "smtp://dummy:dummy@smtp.example.com:587",
@@ -10,9 +10,8 @@ const authOptions: NextAuthOptions = {
   ],
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET || "dummy-secret-for-demo",
-};
+});
 
-const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
 
 
