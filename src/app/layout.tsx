@@ -35,7 +35,7 @@ export default function RootLayout({
               <a href="/pricing" className="hover:underline">Pricing</a>
               <a href="/blog" className="hover:underline">Blog</a>
               <a href="/verify/demo" className="hover:underline">Verify</a>
-              <a href="/api/auth/signin" className="rounded-md px-3 py-1.5 bg-foreground text-background">Sign in</a>
+              <a href="/assessment" className="rounded-md px-3 py-1.5 bg-foreground text-background">Take Assessment</a>
             </div>
           </nav>
         </header>
