@@ -1,0 +1,187 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Domain tags aligned with OpsAI Proficiency focus areas
+enum DomainTag {
+  ai_fundamentals
+  prompt_engineering
+  predictive_maintenance
+  automation
+  cmms
+  energy_analytics
+  compliance_ai
+}
+
+model Org {
+  id          String        @id @default(cuid())
+  name        String
+  domain      String?       @unique
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  memberships Membership[]
+  certificates Certificate[]
+  payments    Payment[]
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  image         String?
+  // For Auth.js email magic link flow
+  emailVerified DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  memberships   Membership[]
+  attempts      Attempt[]
+  certificates  Certificate[]
+  payments      Payment[]
+}
+
+model Membership {
+  id        String  @id @default(cuid())
+  userId    String
+  orgId     String
+  role      Role    @default(member)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+  org  Org  @relation(fields: [orgId], references: [id])
+
+  @@unique([userId, orgId])
+}
+
+enum Role {
+  owner
+  admin
+  member
+}
+
+model Assessment {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  isOfficial  Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  questions   Question[]
+  attempts    Attempt[]
+}
+
+model Question {
+  id            String     @id @default(cuid())
+  assessmentId  String
+  order         Int
+  prompt        String
+  type          QuestionType
+  domain        DomainTag
+  // JSON payload for choices, correct answers, scenario, etc.
+  content       Json
+  weight        Float      @default(1)
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id])
+
+  @@unique([assessmentId, order])
+}
+
+enum QuestionType {
+  multiple_choice
+  multi_select
+  scenario
+  short_text
+}
+
+model Attempt {
+  id            String      @id @default(cuid())
+  userId        String
+  assessmentId  String
+  startedAt     DateTime    @default(now())
+  submittedAt   DateTime?
+  durationSec   Int?
+  // Autosaved answers structure, opaque to DB
+  answers       Json        @default("{}")
+  // Computed by scoreAttempt()
+  rawScore      Float?      // sum of weights for correct items
+  weightedScore Float?
+  domainScores  Json?
+  passed        Boolean?    // computed vs threshold for official cert
+
+  user       User       @relation(fields: [userId], references: [id])
+  assessment Assessment @relation(fields: [assessmentId], references: [id])
+  certificate Certificate?
+}
+
+model Certificate {
+  id           String    @id @default(cuid())
+  code         String    @unique
+  userId       String
+  orgId        String?
+  attemptId    String    @unique
+  url          String    // S3 object URL
+  issuedAt     DateTime  @default(now())
+  expiresAt    DateTime?
+
+  user    User    @relation(fields: [userId], references: [id])
+  org     Org?    @relation(fields: [orgId], references: [id])
+  attempt Attempt @relation(fields: [attemptId], references: [id])
+}
+
+model Payment {
+  id            String    @id @default(cuid())
+  userId        String?
+  orgId         String?
+  // Stripe linkage
+  stripeSessionId String  @unique
+  stripeCustomerId String?
+  stripePaymentIntentId String?
+  product       Product
+  quantity      Int       @default(1)
+  amountCents   Int
+  currency      String    @default("usd")
+  status        PaymentStatus @default(pending)
+  entitlement   Entitlement?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User? @relation(fields: [userId], references: [id])
+  org  Org?  @relation(fields: [orgId], references: [id])
+}
+
+enum Product {
+  assessment_individual
+  team_pack_50
+  certificate_official
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  refunded
+  failed
+}
+
+model Entitlement {
+  id           String   @id @default(cuid())
+  paymentId    String   @unique
+  // For team packs, number of seats and seats used
+  seatsTotal   Int      @default(1)
+  seatsUsed    Int      @default(0)
+  // For certificate right after pass
+  canIssueCertificate Boolean @default(false)
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+}
